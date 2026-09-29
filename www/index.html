@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Habs – Habit Tracker</title>
+<style>
+:root{--bg:#f6f5ff;--card:#fff;--tx:#1d1b2e;--mu:#6c6a80;--ac:#6c4cf5;--ac2:#ff8a3d;--ok:#22a06b;--bd:#e6e3f5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12101f;--card:#1c1930;--tx:#efedfb;--mu:#9a97b5;--bd:#2c2848}}
+:root[data-theme="dark"]{--bg:#12101f;--card:#1c1930;--tx:#efedfb;--mu:#9a97b5;--bd:#2c2848}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#app{max-width:480px;margin:0 auto;padding:16px 16px 96px}
+h2{font-size:16px;margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:10px}.sp{justify-content:space-between}
+.mu{color:var(--mu);font-size:13px}
+.chips{display:flex;gap:8px;margin:10px 0}
+.chip{flex:1;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px;text-align:center}
+.chip b{display:block;font-size:20px}
+.bar{height:10px;background:var(--bd);border-radius:9px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ac),var(--ac2));border-radius:9px}
+button{font:inherit;border:0;border-radius:12px;padding:10px 14px;background:var(--ac);color:#fff;font-weight:600;cursor:pointer}
+button.g{background:var(--bd);color:var(--tx)}button:disabled{opacity:.5}
+input{font:inherit;width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--bd);background:var(--card);color:var(--tx)}
+.hab{cursor:pointer}.hab.d{opacity:.65}.hab.d .n{text-decoration:line-through}
+.ck{width:28px;height:28px;border-radius:50%;border:2px solid var(--ac);display:grid;place-items:center;flex:none;color:#fff}
+.d .ck{background:var(--ok);border-color:var(--ok)}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:9px;color:#fff}
+.easy{background:#22a06b}.medium{background:#e8a317}.hard{background:#e5484d}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+nav button{flex:1;background:none;color:var(--mu);border-radius:0;padding:10px 0;font-size:12px}
+nav button.on{color:var(--ac)}nav span{display:block;font-size:20px}
+.bars{display:flex;gap:6px;align-items:flex-end;height:90px}
+.bars div{flex:1;text-align:center;font-size:11px;color:var(--mu)}
+.bars i{display:block;background:var(--ac);border-radius:6px 6px 0 0;min-height:3px;margin-bottom:4px}
+#toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:14px;z-index:9;display:none;max-width:90%;text-align:center}
+.adv{padding:8px 0;border-bottom:1px solid var(--bd)}.adv:last-child{border:0}
+</style></head><body>
+<div id="toast"></div><div id="app"></div>
+<nav id="nav"></nav>
+<script>
+const K='habs_v1',RW={easy:10,medium:25,hard:50};
+const T=[
+{id:1,d:'easy',t:'Drink 8 glasses of water'},{id:2,d:'easy',t:'Make your bed'},{id:3,d:'easy',t:'Stretch for 5 minutes'},
+{id:4,d:'medium',t:'Walk 6,000 steps'},{id:5,d:'medium',t:'Read 15 pages of a book'},{id:6,d:'medium',t:'Meditate for 10 minutes'},
+{id:7,d:'hard',t:'30-minute workout'},{id:8,d:'hard',t:'No social media all day'},{id:9,d:'hard',t:'Study deeply for 2 hours'}];
+const SHOP=[
+{id:'t1',k:'title',n:'Early Bird',p:60},{id:'t2',k:'title',n:'Iron Will',p:120},{id:'t3',k:'title',n:'Streak Slayer',p:200},{id:'t4',k:'title',n:'Habit Master',p:400},{id:'t5',k:'title',n:'Legend',p:800},
+{id:'s1',k:'sig',n:'✦ Stay consistent',p:80},{id:'s2',k:'sig',n:'🔥 Built different',p:150},{id:'s3',k:'sig',n:'⚡ 1% better daily',p:250},{id:'s4',k:'sig',n:'👑 Discipline > motivation',p:500}];
+const dk=d=>{d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const ago=n=>{const d=new Date();d.setDate(d.getDate()-n);return d};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const need=l=>100+(l-1)*50;
+let S=(()=>{try{const r=localStorage.getItem(K);if(r)return JSON.parse(r)}catch(e){}return{habits:[],done:{},dayDone:{},quest:null,qlog:[],habs:0,exp:0,level:1,best:0,owned:[],eq:{title:'',sig:''}}})();
+let tab='today';
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',2600)}
+function streak(){let n=0,i=S.dayDone[dk()]?0:1;while(S.dayDone[dk(ago(i))]){n++;i++}return n}
+function gainExp(x){S.exp+=x;while(S.exp>=need(S.level)){S.exp-=need(S.level);S.level++;const r=S.level*25;S.habs+=r;toast('🎉 Level '+S.level+' unlocked! +'+r+' Habs')}}
+function toggle(id){const t=dk();S.done[t]=S.done[t]||[];if(S.done[t].includes(id))return;S.done[t].push(id);gainExp(10);
+ const all=S.habits.every(h=>S.done[t].includes(h.id));
+ if(all){S.dayDone[t]=1;gainExp(20);const s=streak();if(s>S.best)S.best=s;toast('All habits done! +20 bonus EXP 🔥')}
+ save();r()}
+function addHabit(){const i=document.getElementById('nh'),v=i.value.trim();if(!v)return;S.habits.push({id:Date.now(),name:v,made:dk()});save();r()}
+function delHabit(id){if(!confirm('Delete this habit?'))return;S.habits=S.habits.filter(h=>h.id!==id);save();r()}
+function pick(id){if(S.quest&&S.quest.date===dk())return;S.quest={date:dk(),id,done:false};save();r()}
+function finishQuest(){const q=S.quest,t=T.find(x=>x.id===q.id);q.done=true;S.habs+=RW[t.d];S.qlog.push({date:q.date,d:t.d});save();toast('+'+RW[t.d]+' Habs earned!');r()}
+function buy(id){const it=SHOP.find(x=>x.id===id);if(S.habs<it.p)return toast('Not enough Habs');S.habs-=it.p;S.owned.push(id);S.eq[it.k]=it.n;save();r()}
+function equip(id){const it=SHOP.find(x=>x.id===id);S.eq[it.k]=S.eq[it.k]===it.n?'':it.n;save();r()}
+const rate=d=>{const ids=S.habits.filter(h=>h.made<=dk(d));if(!ids.length)return null;const dn=(S.done[dk(d)]||[]).filter(i=>ids.some(h=>h.id===i)).length;return dn/ids.length};
+const pct=x=>x==null?'–':Math.round(x*100)+'%';
+function today(){const t=dk(),dn=S.done[t]||[],q=S.quest&&S.quest.date===t?S.quest:null,qt=q&&T.find(x=>x.id===q.id),n=need(S.level);
+ let h=`<div class="row sp"><div><div style="font-size:22px;font-weight:800">Habs</div><div class="mu">${esc(S.eq.title||'Newcomer')}${S.eq.sig?' · '+esc(S.eq.sig):''}</div></div><div class="chip" style="flex:none;padding:8px 14px"><b>🪙 ${S.habs}</b></div></div>
+ <div class="card"><div class="row sp"><b>Level ${S.level}</b><span class="mu">${S.exp}/${n} EXP</span></div><div class="bar"><i style="width:${S.exp/n*100}%"></i></div><div class="mu" style="margin-top:6px">Next level reward: ${(S.level+1)*25} Habs</div></div>
+ <div class="chips"><div class="chip"><b>🔥 ${streak()}</b><span class="mu">streak</span></div><div class="chip"><b>🏆 ${S.best}</b><span class="mu">best</span></div><div class="chip"><b>${dn.length}/${S.habits.length}</b><span class="mu">today</span></div></div>
+ <h2>Daily quest</h2>`;
+ if(q){h+=`<div class="card"><div class="row sp"><b>${esc(qt.t)}</b><span class="tag ${qt.d}">${qt.d}</span></div><div class="row sp" style="margin-top:10px"><span class="mu">Reward: ${RW[qt.d]} Habs</span>${q.done?'<b style="color:var(--ok)">✓ Done</b>':'<button onclick="finishQuest()">Complete</button>'}</div></div>`}
+ else{h+='<div class="mu" style="margin-bottom:8px">Pick ONE quest for today. Harder = more Habs.</div>';['easy','medium','hard'].forEach(d=>T.filter(x=>x.d===d).forEach(x=>h+=`<div class="card row sp"><div><span class="tag ${d}">${d} · ${RW[d]} 🪙</span><div style="margin-top:4px">${esc(x.t)}</div></div><button class="g" onclick="pick(${x.id})">Pick</button></div>`))}
+ h+='<h2>Today\'s habits</h2>';
+ if(!S.habits.length)h+='<div class="card mu">No habits yet. Add some in the Habits tab.</div>';
+ S.habits.forEach(x=>{const d=dn.includes(x.id);h+=`<div class="card hab row ${d?'d':''}" onclick="toggle(${x.id})"><div class="ck">${d?'✓':''}</div><div class="n" style="flex:1">${esc(x.name)}</div><span class="mu">+10 EXP</span></div>`});
+ return h}
+function habits(){let h=`<h2 style="margin-top:0">Your habits</h2><div class="row" style="margin-bottom:12px"><input id="nh" placeholder="New habit, e.g. Read 20 pages" onkeydown="if(event.key==='Enter')addHabit()"><button onclick="addHabit()">Add</button></div>`;
+ if(!S.habits.length)h+='<div class="mu">Nothing here yet.</div>';
+ S.habits.forEach(x=>{let c=0;for(let i=0;i<14;i++)if((S.done[dk(ago(i))]||[]).includes(x.id))c++;h+=`<div class="card row sp"><div><b>${esc(x.name)}</b><div class="mu">${c}/14 days · since ${x.made}</div></div><button class="g" onclick="delHabit(${x.id})">✕</button></div>`});
+ return h}
+function insights(){const ha=S.habits;let tot=0;Object.values(S.done).forEach(a=>tot+=a.length);
+ const days=[...Array(7)].map((_,i)=>{const d=ago(6-i);return{l:'SMTWTFS'[d.getDay()],r:rate(d)}}),v=days.map(x=>x.r).filter(x=>x!=null),r7=v.length?v.reduce((a,b)=>a+b,0)/v.length:null;
+ let h=`<h2 style="margin-top:0">Dashboard</h2><div class="chips"><div class="chip"><b>${pct(r7)}</b><span class="mu">7-day rate</span></div><div class="chip"><b>${tot}</b><span class="mu">habits done</span></div><div class="chip"><b>${S.qlog.length}</b><span class="mu">quests</span></div></div>
+ <div class="card"><b>Last 7 days</b><div class="bars" style="margin-top:10px">${days.map(x=>`<div><i style="height:${(x.r||0)*70}px"></i>${x.l}</div>`).join('')}</div></div>`;
+ const hr=ha.map(x=>{let c=0,n=0;for(let i=0;i<14;i++){if(dk(ago(i))<x.made)continue;n++;if((S.done[dk(ago(i))]||[]).includes(x.id))c++}return{n:x.name,r:n?c/n:null}}).filter(x=>x.r!=null);
+ h+='<div class="card"><b>Per habit (14 days)</b>'+(hr.length?hr.map(x=>`<div style="margin-top:8px"><div class="row sp"><span>${esc(x.n)}</span><span class="mu">${pct(x.r)}</span></div><div class="bar"><i style="width:${x.r*100}%"></i></div></div>`).join(''):'<div class="mu">No data yet.</div>')+'</div>';
+ const A=[];
+ if(!ha.length)A.push('Add a few habits to start getting feedback.');
+ else{
+  if(r7!=null)A.push(r7>=.8?'💪 Excellent consistency this week. Keep the streak alive.':r7>=.5?'👍 Decent week, but there\'s room to improve. Aim for 80%+.':'⚠️ Completion is low this week. Try fewer, easier habits and build up.');
+  if(hr.length>1){const s=[...hr].sort((a,b)=>a.r-b.r);A.push('🎯 Focus more on "'+esc(s[0].n)+'" ('+pct(s[0].r)+'). Try attaching it to a fixed time or trigger.');if(s[s.length-1].r>0)A.push('⭐ Strongest habit: "'+esc(s[s.length-1].n)+'" ('+pct(s[s.length-1].r)+').')}
+  else if(hr.length===1&&hr[0].r<.6)A.push('🎯 Focus more on "'+esc(hr[0].n)+'" ('+pct(hr[0].r)+').');
+  const w=Array(7).fill(0).map(()=>[0,0]);for(let i=0;i<28;i++){const d=ago(i),x=rate(d);if(x!=null&&i>0){w[d.getDay()][0]+=x;w[d.getDay()][1]++}}
+  const wk=w.map((a,i)=>({i,r:a[1]>=2?a[0]/a[1]:null})).filter(x=>x.r!=null).sort((a,b)=>a.r-b.r);
+  if(wk.length>1&&wk[0].r<.7)A.push('📉 '+['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'][wk[0].i]+' are your weakest day ('+pct(wk[0].r)+'). Plan ahead for them.');
+  const hd=S.qlog.filter(x=>x.d==='hard').length;if(S.qlog.length>=3&&hd===0)A.push('🚀 You only pick easy/medium quests. Try a hard one for 50 Habs.');
+  if(!S.qlog.length)A.push('🪙 You haven\'t done a daily quest yet. Quests are your main source of Habs.');
+  if(!S.dayDone[dk()])A.push('⏳ Finish all habits today to keep your streak and earn +20 bonus EXP.')}
+ h+='<div class="card"><b>Coach</b>'+A.map(x=>`<div class="adv">${x}</div>`).join('')+'</div>';return h}
+function shop(){let h=`<div class="row sp"><h2 style="margin:0">Shop</h2><b>🪙 ${S.habs}</b></div><div class="mu" style="margin:6px 0 12px">Spend Habs on titles and signatures. Streaks can\'t be bought.</div>`;
+ [['title','Titles'],['sig','Signatures']].forEach(([k,l])=>{h+=`<h2>${l}</h2>`;SHOP.filter(x=>x.k===k).forEach(x=>{const o=S.owned.includes(x.id),e=S.eq[k]===x.n;h+=`<div class="card row sp"><b>${esc(x.n)}</b>${o?`<button class="${e?'':'g'}" onclick="equip('${x.id}')">${e?'Equipped':'Equip'}</button>`:`<button ${S.habs<x.p?'disabled':''} onclick="buy('${x.id}')">🪙 ${x.p}</button>`}</div>`})});return h}
+function r(){document.getElementById('app').innerHTML={today,habits,insights,shop}[tab]();
+ document.getElementById('nav').innerHTML=[['today','🏠','Today'],['habits','✅','Habits'],['insights','📊','Insights'],['shop','🛍️','Shop']].map(x=>`<button class="${tab===x[0]?'on':''}" onclick="tab='${x[0]}';r();scrollTo(0,0)"><span>${x[1]}</span>${x[2]}</button>`).join('')}
+r();
+</script></body></html>
